@@ -94,3 +94,25 @@ npm run dev
 The application will be available at `http://localhost:3000`.
 
 Good luck, engineer! This is your chance to step into the shoes of a security professional and make a real impact on the quality and safety of this application. Happy hunting!
+
+## Security Audit Findings and Fixes
+
+During the security audit, the following vulnerabilities were identified and subsequently remediated:
+
+### 1. Client-side Redirect after Login
+
+*   **Location:** `app/(auth)/login/page.tsx` and `app/lib/actions/auth-actions.ts`
+*   **Impact:** The original implementation used a client-side redirect after successful login. This could be exploited as an open redirect vulnerability, potentially leading to session hijacking or phishing attacks if a malicious actor could control the redirect URL.
+*   **Fix:** The client-side redirect was replaced with a server-side `redirect` call within the `login` server action in `app/lib/actions/auth-actions.ts`. This ensures that the redirect is handled securely on the server, preventing manipulation by malicious clients.
+
+### 2. Misuse of SUPABASE_SECRET_KEY
+
+*   **Location:** `lib/supabase/middleware.ts`
+*   **Impact:** The `SUPABASE_SECRET_KEY` was incorrectly accessed in `lib/supabase/middleware.ts` using `process.env.NEXT_PUBLIC_SUPABASE_URL` and `process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY`, which are intended for client-side public keys. This could potentially expose the sensitive secret key if not handled carefully.
+*   **Fix:** The environment variable access in `lib/supabase/middleware.ts` was corrected to use `process.env.SUPABASE_URL` and `process.env.SUPABASE_ANON_KEY`. Users were instructed to ensure these non-public environment variables are correctly defined in `.env.local` for server-side access, while `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are used for client-side initialization.
+
+### 3. Lack of Authorization Check in `deletePoll` Function
+
+*   **Location:** `app/lib/actions/poll-actions.ts`
+*   **Impact:** The `deletePoll` server action lacked an authorization check, allowing any authenticated user to delete any poll by simply knowing its ID. This is a critical data integrity vulnerability that could lead to unauthorized data deletion and denial of service.
+*   **Fix:** An authorization check was implemented within the `deletePoll` function. This check now verifies that the authenticated user attempting to delete a poll is indeed the creator of that poll by comparing the `user_id` of the requesting user with the `user_id` associated with the poll in the database. If the user is not the owner, the deletion request is rejected.
