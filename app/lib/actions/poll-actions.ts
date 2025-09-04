@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "../../../lib/supabase/server";
 import { revalidatePath } from "next/cache";
 
 // CREATE POLL
@@ -98,6 +98,31 @@ export async function submitVote(pollId: string, optionIndex: number) {
 // DELETE POLL
 export async function deletePoll(id: string) {
   const supabase = await createClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+  if (userError) {
+    return { error: userError.message };
+  }
+  if (!user) {
+    return { error: "You must be logged in to delete a poll." };
+  }
+
+  const { data: poll, error: fetchError } = await supabase
+    .from("polls")
+    .select("user_id")
+    .eq("id", id)
+    .single();
+
+  if (fetchError) {
+    return { error: fetchError.message };
+  }
+
+  if (!poll || poll.user_id !== user.id) {
+    return { error: "You are not authorized to delete this poll." };
+  }
+
   const { error } = await supabase.from("polls").delete().eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/polls");
@@ -118,11 +143,7 @@ export async function updatePoll(pollId: string, formData: FormData) {
   // Get user from session
   const {
     data: { user },
-    error: userError,
   } = await supabase.auth.getUser();
-  if (userError) {
-    return { error: userError.message };
-  }
   if (!user) {
     return { error: "You must be logged in to update a poll." };
   }
